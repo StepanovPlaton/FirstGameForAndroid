@@ -8,8 +8,10 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
@@ -34,6 +36,9 @@ import java.net.Socket;
 import java.util.Random;
 
 import android.os.Vibrator;
+import android.widget.Toast;
+
+import static android.app.PendingIntent.getActivity;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -41,32 +46,28 @@ public class MainActivity extends AppCompatActivity {
     public int height = 0;
     public float R_ball = 0;
     TextView tv;
+    TextView IP_print;
     ImageView im;
     ImageView im2;
     SensorManager sensorManager;
     Sensor sensor;
     EditText input;
     Button button_conn;
+    Button serv;
     Socket client;
     Vibrator vibrate;
     PrintWriter out;
     String IP = "";
-    int x_ball_cell = 2;
-    int y_ball_cell = 2;
-    float x_ball = 75;
-    float y_ball = 75;
-    float x_ball_old = 75;
-    float y_ball_old = 75;
+
+    Boolean toast_server = false;
+    Boolean view = false;
+    Boolean restart = false;
+
     float start_x;
     float start_y;
-    float speed_x;
-    float speed_y;
     Boolean set_start = false;
 
-    float x_two_player = 350;
-    float y_two_player = 1000;
-
-    boolean array_upload = false;
+    Boolean array_upload = false;
 
     int[][] playing_field = new int[15][23];
 
@@ -74,11 +75,32 @@ public class MainActivity extends AppCompatActivity {
     RelativeLayout.LayoutParams lp_x;
     RelativeLayout.LayoutParams lp_y;
     RelativeLayout.LayoutParams lp_xy;
+
+    public class player {
+        float x = 75;
+        float y = 75;
+        float x_old = 75;
+        float y_old = 75;
+        int x_cell = 2;
+        int y_cell = 2;
+        float speed_x = 0;
+        float speed_y = 0;
+
+        player(int x, int y) {
+            this.x = x;
+            this.y = y;
+            this.x_old = x;
+            this.y_old = y;
+        }
+    }
+
+    player first_player = new player(75, 75);
+    player second_player = new player(-100, -100);
+
     SensorEventListener listenerLight = new SensorEventListener() {
 
         @Override
-        public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        }
+        public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
         @Override
         public void onSensorChanged(SensorEvent event) {
@@ -95,123 +117,124 @@ public class MainActivity extends AppCompatActivity {
 
             if (x - start_x >= 0.5) {
                 Out += "Left ";
-                speed_x -= (width / 720.0f) * (float) control_angle_phone(Math.abs(x - start_x));
+                first_player.speed_x -= (width / 720.0f) * (float) control_angle_phone(Math.abs(x - start_x));
             }
             if (x - start_x <= -0.5) {
                 Out += "Right ";
-                speed_x += (width / 720.0f) * (float) control_angle_phone(Math.abs(x - start_x));
+                first_player.speed_x += (width / 720.0f) * (float) control_angle_phone(Math.abs(x - start_x));
             }
 
             if (y - start_y >= 0.5) {
                 Out += "Down ";
-                speed_y += (width / 720.0f) * (float) control_angle_phone(Math.abs(y - start_y));
+                first_player.speed_y += (width / 720.0f) * (float) control_angle_phone(Math.abs(y - start_y));
             }
             if (y - start_y <= -0.5) {
                 Out += "Up ";
-                speed_y -= (width / 720.0f) * (float) control_angle_phone(Math.abs(y - start_y));
+                first_player.speed_y -= (width / 720.0f) * (float) control_angle_phone(Math.abs(y - start_y));
             }
 
             boolean move_x = false;
             boolean move_y = false;
 
-            x_ball_cell = (int) (x_ball) / (int) (width / playing_field.length);
-            y_ball_cell = (int) (y_ball) / (int) (width / playing_field.length);
+            first_player.x_cell = (int) (first_player.x) / (int) (width / playing_field.length);
+            first_player.y_cell = (int) (first_player.y) / (int) (width / playing_field.length);
 
             float to_wall_x = 0;
             float to_wall_y = 0;
 
-            if (speed_x > 0) {
-                if (playing_field[x_ball_cell + 1][y_ball_cell] != 1 || x_ball + speed_x + (R_ball / 2f) < (x_ball_cell + 1) * (float) (width / playing_field.length)) {
+            if (first_player.speed_x > 0) {
+                if (playing_field[first_player.x_cell + 1][first_player.y_cell] != 1 || first_player.x + first_player.speed_x + (R_ball / 2f) < (first_player.x_cell + 1) * (float) (width / playing_field.length)) {
                     move_x = true;
-                } else if (playing_field[x_ball_cell + 1][y_ball_cell] != 1 || x_ball + (R_ball / 2f) < (x_ball_cell + 1) * (float) (width / playing_field.length)) {
-                    to_wall_x = x_ball + (R_ball / 2f) - (float) (x_ball_cell + 1) * (float) (width / playing_field.length);
+                } else if (playing_field[first_player.x_cell + 1][first_player.y_cell] != 1 || first_player.x + (R_ball / 2f) < (first_player.x_cell + 1) * (float) (width / playing_field.length)) {
+                    to_wall_x = first_player.x + (R_ball / 2f) - (float) (first_player.x_cell + 1) * (float) (width / playing_field.length);
                 } else {
-                    speed_x = 0;
+                    first_player.speed_x = 0;
                 }
             }
-            if (speed_x < 0) {
-                if (playing_field[x_ball_cell - 1][y_ball_cell] != 1 || x_ball + speed_x - (R_ball / 2f) > x_ball_cell * (float) (width / playing_field.length)) {
+            if (first_player.speed_x < 0) {
+                if (playing_field[first_player.x_cell - 1][first_player.y_cell] != 1 || first_player.x + first_player.speed_x - (R_ball / 2f) > first_player.x_cell * (float) (width / playing_field.length)) {
                     move_x = true;
-                } else if (playing_field[x_ball_cell - 1][y_ball_cell] != 1 || x_ball - (R_ball / 2f) > x_ball_cell * (float) (width / playing_field.length)) {
-                    to_wall_x = x_ball - (R_ball / 2f) - (float) x_ball_cell * (float) (width / playing_field.length);
+                } else if (playing_field[first_player.x_cell - 1][first_player.y_cell] != 1 || first_player.x - (R_ball / 2f) > first_player.x_cell * (float) (width / playing_field.length)) {
+                    to_wall_x = first_player.x - (R_ball / 2f) - (float) first_player.x_cell * (float) (width / playing_field.length);
                 } else {
-                    speed_x = 0;
+                    first_player.speed_x = 0;
                 }
             }
-            if (speed_y > 0) {
-                if (playing_field[x_ball_cell][y_ball_cell + 1] != 1 || y_ball + speed_y + (R_ball / 2f) < (y_ball_cell + 1) * (float) (width / playing_field.length)) {
+            if (first_player.speed_y > 0) {
+                if (playing_field[first_player.x_cell][first_player.y_cell + 1] != 1 || first_player.y + first_player.speed_y + (R_ball / 2f) < (first_player.y_cell + 1) * (float) (width / playing_field.length)) {
                     move_y = true;
-                } else if (playing_field[x_ball_cell][y_ball_cell + 1] != 1 || y_ball + (R_ball / 2f) < (y_ball_cell + 1) * (float) (width / playing_field.length)) {
-                    to_wall_y = y_ball + (R_ball / 2f) - (float) (y_ball_cell + 1) * (float) (width / playing_field.length);
+                } else if (playing_field[first_player.x_cell][first_player.y_cell + 1] != 1 || first_player.y + (R_ball / 2f) < (first_player.y_cell + 1) * (float) (width / playing_field.length)) {
+                    to_wall_y = first_player.y + (R_ball / 2f) - (float) (first_player.y_cell + 1) * (float) (width / playing_field.length);
                 } else {
-                    speed_y = 0;
+                    first_player.speed_y = 0;
                 }
 
             }
-            if (speed_y < 0) {
-                if (playing_field[x_ball_cell][y_ball_cell - 1] != 1 || y_ball + speed_y - (R_ball / 2f) > y_ball_cell * (float) (width / playing_field.length)) {
+            if (first_player.speed_y < 0) {
+                if (playing_field[first_player.x_cell][first_player.y_cell - 1] != 1 || first_player.y + first_player.speed_y - (R_ball / 2f) > first_player.y_cell * (float) (width / playing_field.length)) {
                     move_y = true;
-                } else if (playing_field[x_ball_cell][y_ball_cell - 1] != 1 || y_ball - (R_ball / 2f) > y_ball_cell * (float) (width / playing_field.length)) {
-                    to_wall_y = y_ball - (R_ball / 2f) - (float) y_ball_cell * (float) (width / playing_field.length);
+                } else if (playing_field[first_player.x_cell][first_player.y_cell - 1] != 1 || first_player.y - (R_ball / 2f) > first_player.y_cell * (float) (width / playing_field.length)) {
+                    to_wall_y = first_player.y - (R_ball / 2f) - (float) first_player.y_cell * (float) (width / playing_field.length);
                 } else {
-                    speed_y = 0;
+                    first_player.speed_y = 0;
                 }
             }
 
             if (move_x && !move_y) {
-                x_ball += speed_x;
+                first_player.x += first_player.speed_x;
                 lp_x = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-                lp_x.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+                lp_x.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
                 im.setLayoutParams(lp_x);
             } else if (!move_x && move_y) {
-                y_ball += speed_y;
+                first_player.y += first_player.speed_y;
                 lp_y = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-                lp_y.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+                lp_y.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
                 im.setLayoutParams(lp_y);
             } else if (move_x && move_y) {
-                x_ball += speed_x;
-                y_ball += speed_y;
+                first_player.x += first_player.speed_x;
+                first_player.y += first_player.speed_y;
                 lp_xy = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-                lp_xy.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+                lp_xy.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
                 im.setLayoutParams(lp_xy);
             }
 
             if (to_wall_x != 0 || to_wall_y != 0) {
-                x_ball += -1 * to_wall_x;
-                y_ball += -1 * to_wall_y;
+                first_player.x += -1 * to_wall_x;
+                first_player.y += -1 * to_wall_y;
 
                 lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-                lp.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+                lp.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
                 im.setLayoutParams(lp);
 
                 vibrate.vibrate(50);
             }
 
             lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-            lp.setMargins((int) x_two_player - 15, (int) y_two_player - 15, 0, 0);
+            lp.setMargins((int) second_player.x - 15, (int) second_player.y - 15, 0, 0);
             im2.setLayoutParams(lp);
 
-            if (speed_x > 0) {
-                speed_x -= 0.5f * (width / 720.0f);
-            } else if (speed_x < 0) {
-                speed_x += 0.5f * (width / 720.0f);
+            if (first_player.speed_x > 0) {
+                first_player.speed_x -= 0.5f * (width / 720.0f);
+            } else if (first_player.speed_x < 0) {
+                first_player.speed_x += 0.5f * (width / 720.0f);
             }
 
-            if (speed_y > 0) {
-                speed_y -= 0.5f * (width / 720.0f);
-            } else if (speed_y < 0) {
-                speed_y += 0.5f * (width / 720.0f);
+            if (first_player.speed_y > 0) {
+                first_player.speed_y -= 0.5f * (width / 720.0f);
+            } else if (first_player.speed_y < 0) {
+                first_player.speed_y += 0.5f * (width / 720.0f);
             }
 
-            if (Math.abs(speed_x) < 0.5f * (width / 720.0f)) {
-                speed_x = 0;
+            if (Math.abs(first_player.speed_x) < 0.5f * (width / 720.0f)) {
+                first_player.speed_x = 0;
             }
-            if (Math.abs(speed_y) < 0.5f * (width / 720.0f)) {
-                speed_y = 0;
+            if (Math.abs(first_player.speed_y) < 0.5f * (width / 720.0f)) {
+                first_player.speed_y = 0;
             }
 
-            tv.setText(String.valueOf(x_two_player) + " " + String.valueOf(y_two_player) + " " + String.valueOf(Math.abs(x - start_x)) + " " + String.valueOf(Math.abs(y - start_y)));
-
+            //tv.setText(String.valueOf(second_player.x) + " " + String.valueOf(second_player.y) + " " + String.valueOf(Math.abs(x - start_x)) + " " + String.valueOf(Math.abs(y - start_y)));
+            if(toast_server) { WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE); IP_print.setText("Ваш IP - "+Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress()));}
+            if(view) { View(); view = false; IP_print.setText("");}
         }
     };
 
@@ -250,13 +273,13 @@ public class MainActivity extends AppCompatActivity {
         height = size.y;
 
         R_ball = (int) (width / playing_field.length) / 2;
-        x_ball = (width / playing_field.length) + (R_ball / 2);
-        y_ball = (width / playing_field.length) + (R_ball / 2);
-        x_ball_old = (width / playing_field.length) + (R_ball / 2);
-        y_ball_old = (width / playing_field.length) + (R_ball / 2);
+        first_player.x = (width / playing_field.length) + (R_ball / 2);
+        first_player.y = (width / playing_field.length) + (R_ball / 2);
+        first_player.x_old = (width / playing_field.length) + (R_ball / 2);
+        first_player.y_old = (width / playing_field.length) + (R_ball / 2);
 
-        float x_two_player = (width / playing_field.length) * 5;
-        float y_two_player = (width / playing_field.length) * 12;
+        second_player.x = (width / playing_field.length) * (-2);
+        second_player.y = (width / playing_field.length) * (-2);
 
         vibrate = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
@@ -279,13 +302,15 @@ public class MainActivity extends AppCompatActivity {
         tv = (TextView) findViewById(R.id.textView);
         input = (EditText) findViewById(R.id.input);
         button_conn = findViewById(R.id.button_connect);
+        IP_print = (TextView) findViewById(R.id.IP);
+        serv = findViewById(R.id.button_server);
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-        lp.setMargins((int) x_two_player - (int) (R_ball / 2), (int) y_two_player - (int) (R_ball / 2), 0, 0);
+        lp.setMargins((int) second_player.x - (int) (R_ball / 2), (int) second_player.y - (int) (R_ball / 2), 0, 0);
         im2.setLayoutParams(lp);
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-        lp.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+        lp.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
         im.setLayoutParams(lp);
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -297,14 +322,8 @@ public class MainActivity extends AppCompatActivity {
         button_conn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 IP = input.getText().toString();
-
-                ViewGroup containerThatHoldsCheckBox = (ViewGroup) button_conn.getParent();
-                containerThatHoldsCheckBox.removeView(button_conn);
-
-                containerThatHoldsCheckBox = (ViewGroup) input.getParent();
-                containerThatHoldsCheckBox.removeView(input);
-
                 Client_or_Server(-1);
+                View();
             }
         });
     }
@@ -318,11 +337,11 @@ public class MainActivity extends AppCompatActivity {
         containerThatHoldsCheckBox.removeView(button);
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT));
-        lp.setMargins((int) 150 * (int) (width / 720.0f), (int) 250 * (int) (width / 720.0f), 0, 0);
+        lp.setMargins((int) (150 * (width / 720.0f)), (int) (250 * (width / 720.0f)), 0, 0);
         input.setLayoutParams(lp);
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT));
-        lp.setMargins((int) 250 * (int) (width / 720.0f), (int) 120 * (int) (width / 720.0f), 0, 0);
+        lp.setMargins((int) (250 * (width / 720.0f)), (int) (120 * (width / 720.0f)), 0, 0);
         button_conn.setLayoutParams(lp);
     }
 
@@ -334,18 +353,23 @@ public class MainActivity extends AppCompatActivity {
         button = findViewById(R.id.button_client);
         containerThatHoldsCheckBox = (ViewGroup) button.getParent();
         containerThatHoldsCheckBox.removeView(button);
+        toast_server = true;
     }
 
     public void upload_plating_field(int i, int x, int y) {
         playing_field[x][y] = i;
     }
 
-    public void Client_or_Server(int client_or_server) {
+    public Boolean Client_or_Server(int client_or_server) {
         if (client_or_server == -1) {
             new Thread(new client()).start();
             while (!array_upload) {
+                if (restart) {
+                    restart = false;
+                    return false;
+                }
+                ;
             }
-            ;
             client_im();
             Log.d("CREATION", "Client");
         } else if (client_or_server == 1) {
@@ -472,16 +496,21 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             }
+
             new Thread(new server()).start();
         }
 
-        x_ball = (width / playing_field.length) + R_ball;
-        y_ball = (width / playing_field.length) + R_ball;
-        x_ball_old = (width / playing_field.length) + R_ball;
-        y_ball_old = (width / playing_field.length) + R_ball;
+        return true;
+    }
+
+    public void View() {
+        first_player.x = (width / playing_field.length) + R_ball;
+        first_player.y = (width / playing_field.length) + R_ball;
+        first_player.x_old = (width / playing_field.length) + R_ball;
+        first_player.y_old = (width / playing_field.length) + R_ball;
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
-        lp.setMargins((int) x_ball - (int) (R_ball / 2), (int) y_ball - (int) (R_ball / 2), 0, 0);
+        lp.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
         im.setLayoutParams(lp);
 
 
@@ -499,7 +528,31 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
 
+    public void clear_EditText_IP() {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                ViewGroup containerThatHoldsCheckBox = (ViewGroup) button_conn.getParent();
+                containerThatHoldsCheckBox.removeView(button_conn);
+
+                containerThatHoldsCheckBox = (ViewGroup) input.getParent();
+                containerThatHoldsCheckBox.removeView(input); }
+        });
+    }
+
+    public void TOAST(final String text) {
+        Log.d("CREATION", "TOAST");
+        try {
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Log.d("CREATION", "TOAST!!!");
+                    Toast.makeText(getBaseContext(), text, Toast.LENGTH_SHORT).show();
+                }
+            });
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     public void client_im() {
@@ -535,6 +588,9 @@ public class MainActivity extends AppCompatActivity {
                 Socket socket = new Socket(InetAddress.getByName(IP), 2048);
                 BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+
+                clear_EditText_IP();
+
                 new Thread(new send_xy()).start();
                 //SystemClock.sleep(5000);
                 for (int x = 0; x < playing_field.length; x++) {
@@ -551,12 +607,14 @@ public class MainActivity extends AppCompatActivity {
                     Log.d("CREATION", "OK SEND   " + str);
                     if (str != null) {
                         String[] tmp = str.split(":");
-                        x_two_player = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length)) + 4f;
-                        y_two_player = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length)) + 4f;
+                        second_player.x = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length)) + 4f;
+                        second_player.y = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length)) + 4f;
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                TOAST("Ошибка подключения!");
+                restart = true;
+                //e.printStackTrace();
             }
         }
     }
@@ -586,10 +644,10 @@ public class MainActivity extends AppCompatActivity {
                     while (true) {
                         Log.d("CREATION", "SEND XY");
 
-                        out.println(String.valueOf((int) ((x_ball / (float) (width / playing_field.length) * 0.8 + x_ball_old / (float) (width / playing_field.length) * 0.2) * 1000)) + ":" +
-                                String.valueOf((int) ((y_ball / (float) (width / playing_field.length) * 0.8 + y_ball_old / (float) (width / playing_field.length) * 0.2) * 1000)));
-                        x_ball_old = x_ball;
-                        y_ball_old = y_ball;
+                        out.println(String.valueOf((int) ((first_player.x / (float) (width / playing_field.length) * 0.8 + first_player.x_old / (float) (width / playing_field.length) * 0.2) * 1000)) + ":" +
+                                String.valueOf((int) ((first_player.y / (float) (width / playing_field.length) * 0.8 + first_player.y_old / (float) (width / playing_field.length) * 0.2) * 1000)));
+                        first_player.x_old = first_player.x;
+                        first_player.y_old = first_player.y;
                         SystemClock.sleep(50);
                     }
                 } catch (Exception e) {
@@ -604,6 +662,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             try {
                 Log.d("CREATION", "CONNECT");
+                toast_server = false; view = true;
                 BufferedReader input = new BufferedReader(new InputStreamReader(client.getInputStream()));
                 out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(client.getOutputStream())), true);
                 for (int x = 0; x < playing_field.length; x++) {
@@ -620,8 +679,8 @@ public class MainActivity extends AppCompatActivity {
                     Log.d("CREATION", "OK SEND   " + str);
                     if (str != null) {
                         String[] tmp = str.split(":");
-                        x_two_player = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length));
-                        y_two_player = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length));
+                        second_player.x = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length));
+                        second_player.y = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length));
                     }
                     //out.println(String.valueOf((int)(x_ball*0.8 + x_ball_old*0.2)) + ":" + String.valueOf((int)(y_ball*0.8 + y_ball_old*0.2))); x_ball_old = x_ball; y_ball_old = y_ball;
                 }

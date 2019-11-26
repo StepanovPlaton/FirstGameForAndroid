@@ -66,19 +66,29 @@
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:layout_marginStart="60dp"
-        android:layout_marginTop="120dp"
+        android:layout_marginStart="103dp"
+        android:layout_marginTop="121dp"
         android:onClick="client"
-        android:text="client" />
+        android:text="Подключиться \n к игре" />
 
     <Button
         android:id="@+id/button_server"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:layout_marginTop="121dp"
-        android:layout_marginEnd="46dp"
+        android:layout_marginStart="111dp"
+        android:layout_marginTop="273dp"
         android:onClick="server"
-        android:text="Server" />
+        android:text="Создать игру" />
+
+    <TextView
+        android:id="@+id/IP"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="95dp"
+        android:layout_marginTop="412dp"
+        android:text="" />
 </RelativeLayout>
