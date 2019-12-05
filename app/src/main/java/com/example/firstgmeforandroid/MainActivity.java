@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     public float R_ball = 0;
     TextView tv;
     TextView IP_print;
+    TextView score;
     ImageView im;
     ImageView im2;
     SensorManager sensorManager;
@@ -61,7 +62,12 @@ public class MainActivity extends AppCompatActivity {
 
     Boolean toast_server = false;
     Boolean view = false;
+    Boolean im_server = false;
     Boolean restart = false;
+
+    String code_target = "";
+    String x_next_target_send = "";
+    String y_next_target_send = "";
 
     float start_x;
     float start_y;
@@ -86,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
         float speed_x = 0;
         float speed_y = 0;
 
+        int score = 0;
+
         player(int x, int y) {
             this.x = x;
             this.y = y;
@@ -94,8 +102,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public class target {
+        int x = 0;
+        int y = 0;
+        RelativeLayout.LayoutParams lp;
+        ImageView im;
+
+        target(int x, int y, RelativeLayout.LayoutParams lp, ImageView im) {
+            this.x = x;
+            this.y = y;
+            this.lp = lp;
+            this.im = im;
+        }
+    }
+
     player first_player = new player(75, 75);
     player second_player = new player(-100, -100);
+
+    target[] targets;
 
     SensorEventListener listenerLight = new SensorEventListener() {
 
@@ -136,8 +160,8 @@ public class MainActivity extends AppCompatActivity {
             boolean move_x = false;
             boolean move_y = false;
 
-            first_player.x_cell = (int) (first_player.x) / (int) (width / playing_field.length);
-            first_player.y_cell = (int) (first_player.y) / (int) (width / playing_field.length);
+            first_player.x_cell = (int) ((first_player.x) / (width / playing_field.length));
+            first_player.y_cell = (int) ((first_player.y) / (width / playing_field.length));
 
             float to_wall_x = 0;
             float to_wall_y = 0;
@@ -232,8 +256,38 @@ public class MainActivity extends AppCompatActivity {
                 first_player.speed_y = 0;
             }
 
-            //tv.setText(String.valueOf(second_player.x) + " " + String.valueOf(second_player.y) + " " + String.valueOf(Math.abs(x - start_x)) + " " + String.valueOf(Math.abs(y - start_y)));
-            if(toast_server) { WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE); IP_print.setText("Ваш IP - "+Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress()));}
+            try {
+                //Log.d("CREATION", "TARGET VIEW - " + String.valueOf(targets.length));
+                for (int tar = 0; tar < targets.length; tar++) {
+                    targets[tar].lp.setMargins((int) (targets[tar].x * (width / playing_field.length) + (int) R_ball/2), (int) (targets[tar].y * (width / playing_field.length) + (int) R_ball/2), 0, 0);
+                    targets[tar].im.setLayoutParams(targets[tar].lp);
+                    targets[tar].im.setImageResource(R.drawable.target);
+                    RelativeLayout RL = findViewById(R.id.RL);
+                    if(targets[tar].im.getParent() == null) { RL.addView(targets[tar].im); }
+
+                    if(targets[tar].x == first_player.x_cell && targets[tar].y == first_player.y_cell) {
+                        Log.d("CREATION", "PLAYER1 NEW SCORE - " + String.valueOf(targets[tar].x)+":"+ String.valueOf(targets[tar].y));
+                        first_player.score++;
+                        targets[tar].lp.setMargins(-100, -100, 0, 0);
+                        targets = removeElementTargets(targets, targets[tar]);
+                        code_target = "del"; x_next_target_send=String.valueOf(targets[tar].x); y_next_target_send=String.valueOf(targets[tar].y);
+                    }
+                    Log.d("CREATION", "PLAYER2 XY - " + String.valueOf(second_player.x_cell)+":"+ String.valueOf(second_player.y_cell));
+                    if(targets[tar].x == second_player.x_cell && targets[tar].y == second_player.y_cell) {
+                        Log.d("CREATION", "PLAYER2 NEW SCORE - " + String.valueOf(targets[tar].x)+":"+ String.valueOf(targets[tar].y));
+                        second_player.score++;
+                        targets[tar].lp.setMargins(-100, -100, 0, 0);
+                        targets = removeElementTargets(targets, targets[tar]);
+                        code_target = "del"; x_next_target_send=String.valueOf(targets[tar].x); y_next_target_send=String.valueOf(targets[tar].y);
+                    }
+                }
+            }   catch (NullPointerException e) { /*Log.d("CREATION", "TARGET VIEW - NO TARGET");*/ }
+                catch (Exception e) { e.printStackTrace(); }
+
+
+
+            tv.setText("Очки = "+first_player.score+" : "+second_player.score);
+            if(toast_server) { WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE); IP_print.setText("Ваш IP - "+Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress())); }
             if(view) { View(); view = false; IP_print.setText("");}
         }
     };
@@ -250,9 +304,33 @@ public class MainActivity extends AppCompatActivity {
         return n;
     }
 
+    public target[] removeElementTargets(target[] original, target element) {
+        if(original.length == 1) { return null; }
+        target[] n = new target[original.length - 1];
+        int el = 0;
+        for (int i = 0; i < original.length; i++) {
+            if (original[i].x != element.x || original[i].y != element.y) {
+                n[el] = new target(original[i].x, original[i].y, original[i].lp, original[i].im);
+                el++;
+            }
+        }
+        return n;
+    }
+
+    public target[] appendElementTargets(target[] original, target element) {
+        int len = 0;
+        target[] n;
+        try {
+            len = original.length;
+            n = new target[len+1];
+            for (int i = 0; i < len; i++) { n[i] = new target(original[i].x, original[i].y, original[i].lp, original[i].im); }
+            n[len] = new target(element.x, element.y, element.lp, element.im);
+        } catch (Exception e) { n = new target[]{new target(element.x, element.y, element.lp, element.im)}; }
+        return n;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        requestWindowFeature(Window.FEATURE_RIGHT_ICON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -283,12 +361,14 @@ public class MainActivity extends AppCompatActivity {
 
         vibrate = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
+        Log.d("CREATION", "VIEW DEMO");
+
         for (int x = 0; x < playing_field.length; x++) {
             for (int y = 0; y < playing_field[0].length; y++) {
                 if (playing_field[x][y] == 1) {
                     final ImageView imageView = new ImageView(this);
                     lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) width / playing_field.length + 1, (int) width / playing_field.length + 1));
-                    lp.setMargins((int) x * (int) width / playing_field.length, (int) y * (int) width / playing_field.length, 0, 0);
+                    lp.setMargins((int) (x * (width / playing_field.length)), (int) (y * (width / playing_field.length)), 0, 0);
                     imageView.setLayoutParams(lp);
                     imageView.setImageResource(R.drawable.wall);
                     RelativeLayout RL = findViewById(R.id.RL);
@@ -304,6 +384,7 @@ public class MainActivity extends AppCompatActivity {
         button_conn = findViewById(R.id.button_connect);
         IP_print = (TextView) findViewById(R.id.IP);
         serv = findViewById(R.id.button_server);
+        score = findViewById(R.id.Score);
 
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
         lp.setMargins((int) second_player.x - (int) (R_ball / 2), (int) second_player.y - (int) (R_ball / 2), 0, 0);
@@ -312,6 +393,8 @@ public class MainActivity extends AppCompatActivity {
         lp = new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball));
         lp.setMargins((int) first_player.x - (int) (R_ball / 2), (int) first_player.y - (int) (R_ball / 2), 0, 0);
         im.setLayoutParams(lp);
+
+        Log.d("CREATION", "INIT SENSOR");
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -368,7 +451,6 @@ public class MainActivity extends AppCompatActivity {
                     restart = false;
                     return false;
                 }
-                ;
             }
             client_im();
             Log.d("CREATION", "Client");
@@ -591,7 +673,7 @@ public class MainActivity extends AppCompatActivity {
 
                 clear_EditText_IP();
 
-                new Thread(new send_xy()).start();
+
                 //SystemClock.sleep(5000);
                 for (int x = 0; x < playing_field.length; x++) {
                     for (int y = 0; y < playing_field[0].length; y++) {
@@ -600,21 +682,44 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 array_upload = true;
+                new Thread(new send_xy()).start();
                 //start_start_xy(out);
                 Log.d("CREATION", "start send");
                 while (true) {
                     String str = input.readLine();
-                    Log.d("CREATION", "OK SEND   " + str);
+                    //Log.d("CREATION", "OK SEND   " + str);
                     if (str != null) {
                         String[] tmp = str.split(":");
                         second_player.x = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length)) + 4f;
                         second_player.y = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length)) + 4f;
+                        second_player.x_cell = (int) ((second_player.x) / (width / playing_field.length));
+                        second_player.y_cell = (int) ((second_player.y) / (width / playing_field.length));
+
+                        try {
+                            Log.d("CREATION", "READ PACKAGE TARGET - " + tmp[2]);
+                            if(tmp[2] == "new" || true) {
+                                Log.d("CREATION", "READ PACKAGE NEW TARGET - " + str);
+                                targets = appendElementTargets(targets, new target(Integer.parseInt(tmp[3]), Integer.parseInt(tmp[4]),
+                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball/2, (int) R_ball/2)),
+                                        new ImageView(getApplicationContext())));
+
+                            }
+                            if (tmp[2] == "del") {
+                                Log.d("CREATION", "READ PACKAGE DEL TARGET - " + str);
+                                targets = removeElementTargets(targets, new target(Integer.parseInt(tmp[3]), Integer.parseInt(tmp[4]),
+                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball / 2, (int) R_ball / 2)),
+                                        new ImageView(getApplicationContext())));
+
+                            }
+                            Log.d("CREATION", "READ PACKAGE TARGET - " + str);
+                        } catch (Exception e) { /*e.printStackTrace(); Log.d("CREATION", "EXEPTION READ PACKAGE TARGET");*/ }
                     }
                 }
             } catch (IOException e) {
                 TOAST("Ошибка подключения!");
                 restart = true;
                 //e.printStackTrace();
+                Log.d("CREATION", "EXEPTION CREATE SOCKET - RESTART SYSTEM - INPUT NEW IP");
             }
         }
     }
@@ -623,6 +728,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             try {
+                im_server = true;
                 ServerSocket server = new ServerSocket(2048, 3);
                 Log.d("CREATION", "CREATE SERVER");
                 while (true) {
@@ -639,16 +745,41 @@ public class MainActivity extends AppCompatActivity {
     public class send_xy implements Runnable {
         @Override
         public void run() {
+            Random random = new Random();
+            int cnt = 0;
+            int x_next_target = 0;
+            int y_next_target = 0;
             while (true) {
                 try {
                     while (true) {
-                        Log.d("CREATION", "SEND XY");
+                        //Log.d("CREATION", "SEND XY!!! CNT - "+String.valueOf(cnt));
 
                         out.println(String.valueOf((int) ((first_player.x / (float) (width / playing_field.length) * 0.8 + first_player.x_old / (float) (width / playing_field.length) * 0.2) * 1000)) + ":" +
-                                String.valueOf((int) ((first_player.y / (float) (width / playing_field.length) * 0.8 + first_player.y_old / (float) (width / playing_field.length) * 0.2) * 1000)));
+                                    String.valueOf((int) ((first_player.y / (float) (width / playing_field.length) * 0.8 + first_player.y_old / (float) (width / playing_field.length) * 0.2) * 1000)) + ":" +
+                                    code_target + ":" +x_next_target_send + ":" + y_next_target_send);
                         first_player.x_old = first_player.x;
                         first_player.y_old = first_player.y;
+                        code_target = "";
+                        x_next_target_send = "";
+                        y_next_target_send = "";
                         SystemClock.sleep(50);
+                        cnt++;
+                        if(cnt >= 100 && im_server == true && x_next_target_send == "") {
+                            cnt = 0;
+                            while(true) {
+                                x_next_target = ((random.nextInt((int) playing_field.length / 2 - 1) + 1) * 2) - 1;
+                                y_next_target = ((random.nextInt((int) playing_field[0].length / 2 - 1) + 1) * 2) - 1;
+                                Boolean no_target_in_this_xy = true;
+                                try {for (int tar = 0; tar < targets.length; tar++) { if(x_next_target == targets[tar].x && y_next_target == targets[tar].y) { break; } } } catch (Exception e) {}
+                                if(playing_field[x_next_target][y_next_target] == 0 && no_target_in_this_xy) { break; }
+                            }
+                            targets = appendElementTargets(targets, new target(x_next_target, y_next_target,
+                                                                    new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball/2, (int) R_ball/2)),
+                                                                    new ImageView(getApplicationContext())));
+                            code_target = "new";
+                            x_next_target_send = String.valueOf(x_next_target);
+                            y_next_target_send = String.valueOf(y_next_target);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -662,7 +793,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             try {
                 Log.d("CREATION", "CONNECT");
-                toast_server = false; view = true;
+                toast_server = false;
                 BufferedReader input = new BufferedReader(new InputStreamReader(client.getInputStream()));
                 out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(client.getOutputStream())), true);
                 for (int x = 0; x < playing_field.length; x++) {
@@ -673,14 +804,18 @@ public class MainActivity extends AppCompatActivity {
                 }
                 //start_start_xy(out);
                 new Thread(new send_xy()).start();
+
+                view = true;
                 while (true) {
 
                     String str = input.readLine();
-                    Log.d("CREATION", "OK SEND   " + str);
+                    //Log.d("CREATION", "OK SEND   " + str);
                     if (str != null) {
                         String[] tmp = str.split(":");
                         second_player.x = (float) (((float) Integer.parseInt(tmp[0]) / 1000f) * (float) (width / playing_field.length));
                         second_player.y = (float) (((float) Integer.parseInt(tmp[1]) / 1000f) * (float) (width / playing_field.length));
+                        second_player.x_cell = (int) ((second_player.x) / (width / playing_field.length));
+                        second_player.y_cell = (int) ((second_player.y) / (width / playing_field.length));
                     }
                     //out.println(String.valueOf((int)(x_ball*0.8 + x_ball_old*0.2)) + ":" + String.valueOf((int)(y_ball*0.8 + y_ball_old*0.2))); x_ball_old = x_ball; y_ball_old = y_ball;
                 }
