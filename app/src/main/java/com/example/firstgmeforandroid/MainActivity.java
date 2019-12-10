@@ -700,14 +700,14 @@ public class MainActivity extends AppCompatActivity {
                             if(tmp[2] == "new" || true) {
                                 Log.d("CREATION", "READ PACKAGE NEW TARGET - " + str);
                                 targets = appendElementTargets(targets, new target(Integer.parseInt(tmp[3]), Integer.parseInt(tmp[4]),
-                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball/2, (int) R_ball/2)),
+                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball*2, (int) R_ball*2)),
                                         new ImageView(getApplicationContext())));
 
                             }
                             if (tmp[2] == "del") {
                                 Log.d("CREATION", "READ PACKAGE DEL TARGET - " + str);
                                 targets = removeElementTargets(targets, new target(Integer.parseInt(tmp[3]), Integer.parseInt(tmp[4]),
-                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball / 2, (int) R_ball / 2)),
+                                        new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball, (int) R_ball)),
                                         new ImageView(getApplicationContext())));
 
                             }
@@ -774,7 +774,7 @@ public class MainActivity extends AppCompatActivity {
                                 if(playing_field[x_next_target][y_next_target] == 0 && no_target_in_this_xy) { break; }
                             }
                             targets = appendElementTargets(targets, new target(x_next_target, y_next_target,
-                                                                    new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball/2, (int) R_ball/2)),
+                                                                    new RelativeLayout.LayoutParams(new ViewGroup.MarginLayoutParams((int) R_ball*2, (int) R_ball*2)),
                                                                     new ImageView(getApplicationContext())));
                             code_target = "new";
                             x_next_target_send = String.valueOf(x_next_target);
